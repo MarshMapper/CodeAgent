@@ -1,0 +1,60 @@
+# Visual Studio / .NET
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build output
+[Bb]in/
+[Oo]bj/
+**/bin/
+**/obj/
+artifacts/
+publish/
+
+# Rider / IDE
+.idea/
+
+# VS Code
+.vscode/
+
+# NuGet
+packages/
+*.nupkg
+*.snupkg
+.nuget/
+
+# Runtime / tooling
+project.lock.json
+project.fragment.lock.json
+project.assets.json
+*.runtimeconfig.json
+*.deps.json
+
+# User secrets and keys
+secrets.json
+*.pfx
+*.key
+*.cer
+
+# Logs and temporary files
+*.log
+*.tlog
+*.cache
+*.tmp
+*.bak
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Misc
+*.db
+*.db-journal
+node_modules/
+
+.vs/
