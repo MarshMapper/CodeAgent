@@ -37,6 +37,7 @@ secrets.json
 *.pfx
 *.key
 *.cer
+.env
 
 # Logs and temporary files
 *.log
