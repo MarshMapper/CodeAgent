@@ -44,7 +44,7 @@ class Program
             {
                 Name = "RoslynMCP",
                 Command = "dotnet",
-                Arguments = ["run", "--project", "\\src\\WinDev\\roslyn-mcp-main\\RoslynMCP\\RoslynMCP.csproj"],
+                Arguments = ["run", "--project", "\\src\\WinDev\\roslyn-mcp\\RoslynMCP\\RoslynMCP.csproj"],
             };
             StdioClientTransportOptions sharpToolsMcpTransportOptions = new()
             {
@@ -112,12 +112,12 @@ class Program
             // passing the tools in here doesn't seem to make a difference when using AIAgent
             var chatOptions = new ChatOptions()
             {
-                // Tools = aiFunctions.Cast<AITool>().ToList(),
-                ToolMode = ChatToolMode.RequireAny
+                ToolMode = ChatToolMode.RequireAny, 
+                MaxOutputTokens = 4000
             };
 
             agentResponse = await agent.RunAsync(
-                "Analyze the file \\src\\WinDev\\CodeAgent\\CodeAgent\\Program.cs"
+                "Analyze the file /src/WinDev/CodeAgent/CodeAgent/Program.cs.  Return the results as markdown."
                 ,
                 options: new ChatClientAgentRunOptions(chatOptions));
                 
