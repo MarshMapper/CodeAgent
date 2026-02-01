@@ -8,6 +8,7 @@ using System.Buffers.Text;
 using System.ClientModel;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
+using OpenAI.Responses;
 
 namespace CodeAgent;
 
@@ -29,6 +30,7 @@ class Program
             Endpoint = new Uri(endpoint),
             NetworkTimeout = TimeSpan.FromMinutes(20)
         };
+#pragma warning disable OPENAI001
         OpenAIClient aiClient;
         IChatClient chatClient;
 
@@ -62,7 +64,7 @@ class Program
                 Console.WriteLine($"  {tool.Name}: {tool.Description}");
             }
             await CallTool(mcpClient, new List<Microsoft.Extensions.AI.ChatMessage>());
-            AgentRunResponse? agentResponse = await GetResponseUsingRunAsync(chatClient, mcpClient, tools, 
+            AgentResponse? agentResponse = await GetResponseUsingRunAsync(chatClient, mcpClient, tools, 
                 useRoslynMcp ? _roslynNcpInstructions : _sharptoolInstructions);
         }
         catch (Exception ex)
@@ -93,17 +95,17 @@ class Program
         return (endpoint, modelId, apiKey);
     }
 
-    private static async Task<AgentRunResponse?> GetResponseUsingRunAsync(IChatClient chatClient, McpClient mcpClient, IList<McpClientTool> tools,
+    private static async Task<AgentResponse?> GetResponseUsingRunAsync(IChatClient chatClient, McpClient mcpClient, IList<McpClientTool> tools,
         string agentInstructions)
     {
-        AgentRunResponse? agentResponse = null;
+        AgentResponse? agentResponse = null;
         try
         {
             // Create AIFunction wrappers for MCP tools with proper execution handlers
             List<AIFunction> aiFunctions = GetAIFunctionsFromTools(mcpClient, tools);
 
             // Create agent with properly configured tools
-            var agent = chatClient.CreateAIAgent(
+            var agent = chatClient.AsAIAgent(
                 name: "CodeAnalyst",
                 instructions: agentInstructions,
                 tools: [.. tools.Cast<AITool>()]
