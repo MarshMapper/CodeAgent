@@ -9,12 +9,19 @@
 
   <ItemGroup>
     <PackageReference Include="DotNetEnv" Version="3.1.1" />
-    <PackageReference Include="Microsoft.Agents.AI" Version="1.0.0-preview.260128.1" />
-    <PackageReference Include="Microsoft.Agents.AI.DevUI" Version="1.0.0-preview.260108.1" />
-    <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.0.0-preview.260108.1" />
-    <PackageReference Include="Microsoft.Agents.AI.Hosting.OpenAI" Version="1.0.0-alpha.260108.1" />
-    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0-preview.260128.1" />
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.0.0-preview.260205.1" />
+    <PackageReference Include="Microsoft.Agents.AI.DevUI" Version="1.0.0-preview.260205.1" />
+    <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.0.0-preview.260205.1" />
+    <PackageReference Include="Microsoft.Agents.AI.Hosting.OpenAI" Version="1.0.0-alpha.260205.1" />
+
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0-preview.260205.1" />
     <PackageReference Include="ModelContextProtocol" Version="0.6.0-preview.1" />
+    <PackageReference Include="OpenTelemetry" Version="1.15.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.15.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.0" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.0" />
   </ItemGroup>
 
 </Project>
