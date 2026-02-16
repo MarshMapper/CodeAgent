@@ -1,37 +1,22 @@
 ﻿using DotNetEnv;
-using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.DevUI;
-using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using OpenAI;
-using OpenAI.Chat;
-using System;
-using System.Buffers.Text;
 using System.ClientModel;
-using ModelContextProtocol.Client;
-using ModelContextProtocol.Protocol;
-using OpenAI.Responses;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Agents.AI.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Hosting;
-using CodeAgent.Mcp;
+using CodeAgent.Agents;
+using CodeAgent.Observability;
 
 namespace CodeAgent;
 
-public class AIAgentOptions
+static class Program
 {
-    public string Name { get; set; }
-    public string Description { get; set; }
-    public string Instructions { get; set; }
-    public IList<McpClientTool> Tools { get; set; }
-    public int MaxOutputTokens { get; set; } = 4000;
-}
-class Program
-{
-    const string SourceName = "OpenTelemetryAspire.ConsoleApp";
-    const string ServiceName = "CodeAgent";
+    const string SourceName = "CodeAgent";
+    const string ServiceName = "CodeAgent.AgentService";
 
     static async Task Main(string[] args)
     {
@@ -58,16 +43,18 @@ class Program
             builder.Services.AddOpenAIResponses();
             builder.Services.AddOpenAIConversations();
 
-            var roslynAgent = await GetRoslynMcpAgent(builder.Services, aiClient, modelId);
-
+            var roslynAgentFactory = new RoslynMcpAgent();
+            var roslynAgent = await roslynAgentFactory.CreateAsync(builder.Services, aiClient, modelId, SourceName);
             builder.AddAIAgent("RoslynAgent", (serviceProvider, key) => roslynAgent);
 
-            var sharpToolsAgent = await GetSharpToolsMcpAgent(builder.Services, aiClient, modelId);
+            var sharpToolsAgentFactory = new SharpToolsMcpAgent();
+            var sharpToolsAgent = await sharpToolsAgentFactory.CreateAsync(builder.Services, aiClient, modelId, SourceName);
             builder.AddAIAgent("SharpToolsAgent", (serviceProvider, key) => sharpToolsAgent);
 
             WebApplication app = builder.Build();
 
-            var appLogger = app.Services.GetRequiredService<ILogger<Program>>();
+            var appLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("CodeAgent.Program");
+
             appLogger.LogInformation("Starting {ServiceName}", ServiceName);
 
             if (builder.Environment.IsDevelopment())
@@ -85,113 +72,6 @@ class Program
             Console.WriteLine($"Stack Trace: {ex.StackTrace}");
             Console.WriteLine($"Note: The agent may have additional requirements. Error details: {ex.GetType().Name}");
         }
-    }
-    private static async Task<AIAgent> GetSharpToolsMcpAgent(IServiceCollection services, OpenAIClient aiClient, string modelId)
-    {
-        StdioClientTransportOptions sharpToolsMcpTransportOptions = new()
-        {
-            Name = "SharpTools",
-            Command = "C:\\src\\WinDev\\SharpToolsMCP-main\\SharpTools.StdioServer\\bin\\Debug\\net8.0\\SharpTools.StdioServer.exe",
-            Arguments = ["--log-directory", "C:\\src\\WinDev\\SharpToolsMCP-main\\logs", "--log-level", "Debug"]
-        };
-        McpClientTools mcpClientTools = new McpClientTools(sharpToolsMcpTransportOptions);
-        // prevent mcpClientTools from being disposed so that the MCP client connection remains open for the lifetime of the agent,
-        // otherwise the tools cannot be used by the agent
-        services.AddSingleton(mcpClientTools);
-        
-        IList<McpClientTool> tools = await mcpClientTools.GetTools();
-
-        AIAgentOptions aIAgentOptions = new AIAgentOptions()
-        {
-            Name = "SharpToolsAgent",
-            Description = "An expert code analyst agent that uses SharpTools analyzers to analyze code files.",
-            Instructions = @"You are an expert code analyst. Follow these steps one at a time:
-    1. Load the solution file first using SharpTool_LoadSolution.  Newer projects use the .slnx extension for solution files.
-    2. Then load the specific project using SharpTool_LoadProject
-    3. Finally analyze the requested file using SharpTool_AnalyzeComplexity
-    Execute each tool in sequence and use the results to provide your analysis.",
-            Tools = tools,
-            MaxOutputTokens = 4000
-        };
-
-        return await GetAIAgent(aiClient, modelId, aIAgentOptions);
-    }
-    private static async Task<AIAgent> GetRoslynMcpAgent(IServiceCollection services, OpenAIClient aiClient, string modelId)
-    {
-        StdioClientTransportOptions rosylnMcpTransportOptions = new()
-        {
-            Name = "RoslynMCP",
-            Command = "dotnet",
-            Arguments = ["run", "--project", "\\src\\WinDev\\roslyn-mcp\\RoslynMCP\\RoslynMCP.csproj"],
-        };
-        McpClientTools mcpClientTools = new McpClientTools(rosylnMcpTransportOptions);
-
-        // prevent mcpClientTools from being disposed so that the MCP client connection remains open for the lifetime of the agent,
-        // otherwise the tools cannot be used by the agent
-        services.AddSingleton(mcpClientTools);
-
-        IList<McpClientTool> tools = await mcpClientTools.GetTools();
-
-        AIAgentOptions aIAgentOptions = new AIAgentOptions()
-        {
-            Name = "RoslynAgent",
-            Description = "An expert code analyst agent that uses Roslyn analyzers to analyze code files.",
-            Instructions = @"You are an expert code analyst.  Run ValidateFile tool to validate the specified file and return any issues found.  Pass true for the runAnalyzers parameter to get code analysis results.",
-            Tools = tools,
-            MaxOutputTokens = 4000
-        };
-
-        return await GetAIAgent(aiClient, modelId, aIAgentOptions);
-    }
-    private static async Task<AIAgent> GetAIAgent(OpenAIClient aiClient, string modelId, AIAgentOptions agentOptions)
-    {
-        var chatOptions = new ChatOptions()
-        {
-            ToolMode = ChatToolMode.RequireAny,
-            MaxOutputTokens = agentOptions.MaxOutputTokens,
-            Instructions = agentOptions.Instructions,
-            Tools = [.. agentOptions.Tools.Cast<AITool>()]
-        };
-
-        var chatAgentOptions = new ChatClientAgentOptions()
-        {
-            ChatOptions = chatOptions,
-            Description = agentOptions.Description,
-            Name = agentOptions.Name
-        };
-
-        AIAgent aIAgent = aiClient.GetChatClient(modelId).AsIChatClient().AsAIAgent(chatAgentOptions)
-            .AsBuilder().UseOpenTelemetry(SourceName, configure: (cfg) => cfg.EnableSensitiveData = true).Build();
-        return aIAgent;
-    }
-    private static async Task<AIAgent> GetAIAgent(OpenAIClient aiClient, string modelId, string agentName)
-    {
-        StdioClientTransportOptions rosylnMcpTransportOptions = new()
-        {
-            Name = "RoslynMCP",
-            Command = "dotnet",
-            Arguments = ["run", "--project", "\\src\\WinDev\\roslyn-mcp\\RoslynMCP\\RoslynMCP.csproj"],
-        };
-        var mcpClient = await McpClient.CreateAsync(new StdioClientTransport(rosylnMcpTransportOptions));
-        var tools = await mcpClient.ListToolsAsync();
-        var chatOptions = new ChatOptions()
-        {
-            ToolMode = ChatToolMode.RequireAny,
-            MaxOutputTokens = 4000,
-            Instructions = @"You are an expert code analyst.  Run ValidateFile tool to validate the specified file and return any issues found.  Pass true for the runAnalyzers parameter to get code analysis results.",
-            Tools = [.. tools.Cast<AITool>()]
-        };
-
-        var chatAgentOptions = new ChatClientAgentOptions()
-        {
-            ChatOptions = chatOptions,
-            Description = "Rosyln MCP Agent",
-            Name = agentName
-        };
-
-        AIAgent aIAgent = aiClient.GetChatClient(modelId).AsIChatClient().AsAIAgent(chatAgentOptions)
-            .AsBuilder().UseOpenTelemetry(SourceName, configure: (cfg) => cfg.EnableSensitiveData = true).Build();
-        return aIAgent;
     }
 
     private static (string endpoint, string modelId, string apiKey) GetModelConfiguration()
@@ -212,70 +92,5 @@ class Program
         var apiKey = use_foundrylocal ? "nokey" : github_token;
 
         return (endpoint, modelId, apiKey);
-    }
-
-    private static async Task<AgentResponse?> GetResponseUsingRunAsync(IChatClient chatClient, McpClient mcpClient, IList<McpClientTool> tools,
-        string agentInstructions)
-    {
-        AgentResponse? agentResponse = null;
-        try
-        {
-            // Create agent with properly configured tools
-            var agent = chatClient.AsAIAgent(
-                name: "CodeAnalyst",
-                instructions: agentInstructions,
-                tools: [.. tools.Cast<AITool>()]
-            );
-
-            // passing the tools in here doesn't seem to make a difference when using AIAgent
-            var chatOptions = new ChatOptions()
-            {
-                ToolMode = ChatToolMode.RequireAny,
-                Tools = [.. tools.Cast<AITool>()],
-                MaxOutputTokens = 4000
-            };
-
-            agentResponse = await agent.RunAsync(
-                "Analyze the file /src/WinDev/CodeAgent/CodeAgent/Program.cs.  Return the results as markdown."
-                ,
-                options: new ChatClientAgentRunOptions(chatOptions));
-
-
-            var functionApprovalRequests = agentResponse.Messages
-                .SelectMany(x => x.Contents)
-                .OfType<FunctionApprovalRequestContent>()
-                .ToList();
-
-            foreach (var requestContent in functionApprovalRequests)
-            {
-                var approvalMessage = new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, [requestContent.CreateResponse(true)]);
-                Console.WriteLine(await agent.RunAsync(approvalMessage));
-            }
-#pragma warning restore MEAI001
-
-            Console.WriteLine($"\n=== Agent Final Response ===");
-            Console.WriteLine(agentResponse);
-            Console.WriteLine();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"GetResponseUsingRunAsync Error: {ex.Message}");
-            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
-            throw;
-        }
-        return agentResponse;
-    }
-
-    public static async Task<IList<Microsoft.Extensions.AI.ChatMessage>> GetResponse(IChatClient chatClient, List<Microsoft.Extensions.AI.ChatMessage> chatHistory, ChatOptions? options = null)
-    {
-        var response = await chatClient.GetResponseAsync(chatHistory, options);
-        Console.WriteLine(response.Text);
-        foreach (var message in response.Messages)
-        {
-            Console.WriteLine($"{message.Role}: {message.Text}");
-        }
-        Console.WriteLine(response.Text);
-
-        return response.Messages;
     }
 }

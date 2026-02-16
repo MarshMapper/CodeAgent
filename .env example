@@ -4,3 +4,6 @@ FOUNDRYLOCAL_MODEL_ID=qwen2.5-coder-7b-instruct-generic-cpu:4
 GITHUB_ENDPOINT=https://models.inference.ai.azure.com
 GITHUB_TOKEN=github_pat_12345
 GITHUB_MODEL_ID=GPT-4o
+ROSLYN_MCP_PATH=\src\WinDev\roslyn-mcp
+SHARPTOOLS_MCP_PATH=\src\WinDev\SharpToolsMCP-main
+SHARPTOOLS_LOG_PATH=\src\WinDev\SharpToolsMCP-main\logs

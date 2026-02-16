@@ -7,10 +7,10 @@ using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using System;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
-namespace CodeAgent;
+
+namespace CodeAgent.Observability;
 internal static class OpenTelemetrySetup
 {
     public static void Configure(
@@ -41,13 +41,13 @@ internal static class OpenTelemetrySetup
             .WithTracing(tracing => tracing
                 .AddSource(sourceName)
                 .AddSource("Microsoft.Agents.AI")
-                // .AddAspNetCoreInstrumentation()
+                .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddOtlpExporter(options => options.Endpoint = otlpUri))
             .WithMetrics(metrics => metrics
                 .AddMeter(sourceName)
                 .AddMeter("Microsoft.Agents.AI")
-                // .AddAspNetCoreInstrumentation()
+                .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation()
                 .AddOtlpExporter(options => options.Endpoint = otlpUri));

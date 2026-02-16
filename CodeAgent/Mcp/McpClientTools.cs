@@ -1,15 +1,15 @@
 
 
 using Microsoft.Extensions.AI;
-using ModelContextProtocol;
 using ModelContextProtocol.Client;
 
 namespace CodeAgent.Mcp;
+
 public class McpClientTools : IAsyncDisposable
 {
     private readonly StdioClientTransportOptions? _stdioClientTransportOptions;
     private readonly HttpClientTransportOptions? _httpClientTransportOptions;
-    private McpClient _mcpClient;
+    private McpClient? _mcpClient;
 
     public McpClientTools(StdioClientTransportOptions stdioClientTransportOptions)
     {
@@ -37,77 +37,90 @@ public class McpClientTools : IAsyncDisposable
         {
             return _mcpClient;
         }
-        if (_stdioClientTransportOptions == null && _httpClientTransportOptions == null)
-        {
-            throw new InvalidOperationException("At least one transport option must be configured.");
-        }
         if (_stdioClientTransportOptions != null && _httpClientTransportOptions != null)
         {
             throw new InvalidOperationException("Only one transport option can be configured at a time.");
         }
-        if (_stdioClientTransportOptions != null)        
+        if (_stdioClientTransportOptions != null)
         {
             _mcpClient = await McpClient.CreateAsync(new StdioClientTransport(_stdioClientTransportOptions));
         }
         else
         {
-            _mcpClient = await McpClient.CreateAsync(new HttpClientTransport(_httpClientTransportOptions));
+            if (_httpClientTransportOptions == null)
+            {
+                throw new InvalidOperationException("Either Stdio or HTTP transport option must be provided.");
+            }
+            else
+            {
+                _mcpClient = await McpClient.CreateAsync(new HttpClientTransport(_httpClientTransportOptions));
+            }
         }
         return _mcpClient;
     }
-    public async Task<IList<McpClientTool>> GetTools()
+    public async Task<IList<McpClientTool>> GetTools(List<string>? toolFilters = null)
     {
         var mcpClient = await GetMcpClient();
-        return await mcpClient.ListToolsAsync();
+        var tools = await mcpClient.ListToolsAsync();
+
+        // Filter tools if toolFilters is provided and not empty
+        if (toolFilters != null && toolFilters.Count > 0)
+        {
+            return tools.Where(tool => toolFilters.Any(filter => tool.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)))
+                        .ToList();
+        }
+
+        return tools;
     }
-    private async Task<List<AIFunction>> GetAIFunctionsFromTools(IList<McpClientTool> tools)
+    private async Task<List<AIFunction>> GetAIFunctionsFromTools(IList<McpClientTool> tools, List<string>? toolFilters = null)
     {
         var mcpClient = await GetMcpClient();
         List<AIFunction> aiFunctions = new();
 
-        foreach (var tool in tools)
+        // Filter tools if toolFilters is provided and not empty
+        var filteredTools = (toolFilters != null && toolFilters.Count > 0)
+            ? tools.Where(tool => toolFilters.Any(filter => tool.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)))
+            : tools;
+
+        foreach (var tool in filteredTools)
         {
-            if (true) // (tool.Name.Contains("Load") || tool.Name.Contains("Analyze"))
-            {
-                // Capture the tool in a local variable to avoid closure issues
-                var currentTool = tool;
+            // Capture the tool in a local variable to avoid closure issues
+            var currentTool = tool;
 
-                // Create an AIFunction that properly executes the MCP tool
-                var aiFunction = AIFunctionFactory.Create(
-                    async (Dictionary<string, object?> arguments) =>
+            // Create an AIFunction that properly executes the MCP tool
+            var aiFunction = AIFunctionFactory.Create(
+                async (Dictionary<string, object?> arguments) =>
+                {
+                    Console.WriteLine($"Executing MCP tool: {currentTool.Name}");
+                    Console.WriteLine($"Arguments: {string.Join(", ", arguments.Select(kvp => $"{kvp.Key}={kvp.Value}"))}");
+
+                    try
                     {
-                        Console.WriteLine($"Executing MCP tool: {currentTool.Name}");
-                        Console.WriteLine($"Arguments: {string.Join(", ", arguments.Select(kvp => $"{kvp.Key}={kvp.Value}"))}");
+                        var result = await mcpClient.CallToolAsync(currentTool.Name, arguments);
+                        var resultText = string.Join("\n", result.Content.Select(c => c.ToString()));
+                        Console.WriteLine($"Tool result: {resultText}");
+                        return resultText;
+                    }
+                    catch (Exception ex)
+                    {
+                        var errorMsg = $"Error executing {currentTool.Name}: {ex.Message}";
+                        Console.WriteLine(errorMsg);
+                        return errorMsg;
+                    }
+                },
+                currentTool.Name,
+                currentTool.Description
+            );
 
-                        try
-                        {
-                            var result = await mcpClient.CallToolAsync(currentTool.Name, arguments);
-                            var resultText = string.Join("\n", result.Content.Select(c => c.ToString()));
-                            Console.WriteLine($"Tool result: {resultText}");
-                            return resultText;
-                        }
-                        catch (Exception ex)
-                        {
-                            var errorMsg = $"Error executing {currentTool.Name}: {ex.Message}";
-                            Console.WriteLine(errorMsg);
-                            return errorMsg;
-                        }
-                    },
-                    currentTool.Name,
-                    currentTool.Description
-                );
-
-                aiFunctions.Add(aiFunction);
-            }
+            aiFunctions.Add(aiFunction);
         }
         return aiFunctions;
     }
-
-    public async Task<IList<Microsoft.Extensions.AI.ChatMessage>> CallTool(List<Microsoft.Extensions.AI.ChatMessage> chatHistory, ChatOptions? options = null)
+    public async Task<IList<ChatMessage>> CallTool(List<ChatMessage> chatHistory, ChatOptions? options = null)
     {
         var mcpClient = await GetMcpClient();
         Console.WriteLine("Calling ValidateFile tool via MCP Client...");
-        Dictionary<string, object> parameters = new Dictionary<string, object>
+        IReadOnlyDictionary<string, object?> parameters = new Dictionary<string, object?>
         {
             { "filePath", "\\src\\windev\\codeagent\\codeagent\\Program.cs" },
             { "runAnalyzers", true }
@@ -121,12 +134,12 @@ public class McpClientTools : IAsyncDisposable
         }
         return chatHistory;
     }
-    private async Task<List<AIFunction>> GetAIFunctionsFromMCPServer()
+    public async Task<List<AIFunction>> GetAIFunctionsFromMCPServer(List<string>? toolFilters = null)
     {
         var mcpClient = await GetMcpClient();
         var tools = await mcpClient.ListToolsAsync();
-        return await GetAIFunctionsFromTools(tools);
-    }   
+        return await GetAIFunctionsFromTools(tools, toolFilters);
+    }
     public async static Task ShowTools(IList<McpClientTool> tools)
     {
         Console.WriteLine("Available tools:");
