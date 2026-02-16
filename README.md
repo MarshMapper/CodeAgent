@@ -1,4 +1,4 @@
-# CodeAgent - AI Agents with Microsoft Agent Framework and Model Context Protocol (MCP) Tools
+# CodeAgent - Demo of creating AI Agents with Microsoft Agent Framework that can use Model Context Protocol (MCP) Tools
 
 ## Overview
 This project demonstrates how to create AI Agents using the **Microsoft Agent Framework** that can interact with tools exposed by **Model Context Protocol (MCP)** servers.  Integration of **DevUI** provides a user interface for interacting with the agents and monitoring their behavior. The agents leverage OpenTelemetry for observability and can work with various AI models including local and cloud-based solutions.
