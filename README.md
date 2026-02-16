@@ -105,7 +105,4 @@ OTLP_ENDPOINT=http://localhost:4317
 - **OpenTelemetry** for observability
 - **DotNetEnv** for configuration
 - **ASP.NET Core** for hosting
-
-## License
-
-This project is provided as a demonstration of the Microsoft Agent Framework and MCP integration patterns.
+- **DevUI** for development user interface
