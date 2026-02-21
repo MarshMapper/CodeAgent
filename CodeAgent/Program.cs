@@ -27,8 +27,7 @@ static class Program
             Endpoint = new Uri(endpoint),
             NetworkTimeout = TimeSpan.FromMinutes(20)
         };
-#pragma warning disable OPENAI001
-#pragma warning disable MEAI001
+
         OpenAIClient aiClient;
 
         var otlpEndpoint = Environment.GetEnvironmentVariable("OTLP_ENDPOINT") ?? "http://localhost:4317";

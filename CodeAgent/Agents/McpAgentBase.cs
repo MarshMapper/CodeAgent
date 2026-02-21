@@ -58,12 +58,8 @@ public abstract class McpAgentBase
             Name = AgentName
         };
 
-#pragma warning disable OPENAI001
-#pragma warning disable MEAI001
         AIAgent agent = aiClient.GetChatClient(modelId).AsIChatClient().AsAIAgent(chatAgentOptions)
             .AsBuilder().UseOpenTelemetry(sourceName, configure: (cfg) => cfg.EnableSensitiveData = true).Build();
-#pragma warning restore MEAI001
-#pragma warning restore OPENAI001
 
         return agent;
     }
